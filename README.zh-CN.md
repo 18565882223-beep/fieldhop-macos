@@ -68,8 +68,9 @@ flowchart LR
 
 ## 从源码构建
 
+先通过 GitHub 的 **Code** 菜单克隆本仓库，然后运行：
+
 ```bash
-git clone <repository-url>
 cd fieldhop-macos
 swift test
 ./scripts/package_app.sh

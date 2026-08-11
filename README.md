@@ -82,8 +82,9 @@ See [SECURITY.md](SECURITY.md) for the disclosure process and data-handling boun
 
 ## Build from source
 
+Clone this repository from GitHub, then run:
+
 ```bash
-git clone <repository-url>
 cd fieldhop-macos
 swift test
 ./scripts/package_app.sh
