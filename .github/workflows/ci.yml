@@ -11,10 +11,11 @@ permissions:
 
 jobs:
   test:
-    runs-on: macos-14
+    # Swift Testing 随 Xcode 16 提供；macOS 15 镜像默认使用 Xcode 16。
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: 显示 Swift 版本
         run: swift --version
       - name: 运行 Swift 测试
@@ -23,4 +24,3 @@ jobs:
         run: |
           node --check ChromeExtension/content.js
           node --check ChromeExtension/service-worker.js
-
