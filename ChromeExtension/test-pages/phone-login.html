@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>短信桥测试页</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 40px; }
+    label { display: block; margin: 14px 0; }
+    input { font-size: 16px; padding: 8px; width: 260px; }
+    button { font-size: 16px; padding: 8px 14px; }
+  </style>
+</head>
+<body>
+  <h1>短信桥测试页</h1>
+  <label>手机号 <input id="phone" placeholder="请输入手机号"></label>
+  <label><input type="checkbox" id="agree"> 已阅读并同意 用户协议、隐私政策</label>
+  <button id="send">发送验证码</button>
+  <label>验证码 <input id="code" placeholder="验证码"></label>
+  <pre id="log"></pre>
+  <script>
+    window.bridgeEvents = [];
+    document.getElementById("send").addEventListener("click", () => {
+      window.bridgeEvents.push({
+        type: "send",
+        phone: document.getElementById("phone").value,
+        agree: document.getElementById("agree").checked,
+        active: document.activeElement.id
+      });
+      document.getElementById("send").textContent = "已发送";
+      document.getElementById("log").textContent = JSON.stringify(window.bridgeEvents, null, 2);
+    });
+  </script>
+</body>
+</html>

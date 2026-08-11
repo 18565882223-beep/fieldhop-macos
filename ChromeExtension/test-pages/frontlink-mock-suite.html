@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>前半链路本地 Mock 测试</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 32px; color: #172033; }
+    #fixture { width: 520px; min-height: 260px; padding: 24px; border: 1px solid #cdd6e5; border-radius: 14px; }
+    form, [role="dialog"] { display: grid; gap: 14px; max-width: 420px; padding: 18px; border-radius: 10px; background: #f7f9fc; }
+    input { box-sizing: border-box; min-height: 38px; padding: 8px; font-size: 15px; }
+    button, [role="checkbox"] { min-height: 36px; padding: 8px 12px; font-size: 15px; cursor: pointer; }
+    .otp { display: flex; gap: 8px; }
+    .otp input { width: 42px; text-align: center; }
+    .geetest-panel { margin: 12px 0; padding: 14px; border: 1px solid #d97706; color: #92400e; background: #fffbeb; }
+    #report { white-space: pre-wrap; line-height: 1.5; }
+    .passed { color: #047857; } .failed { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <h1>前半链路本地 Mock 测试</h1>
+  <p id="status">等待前半链路测试 API 加载…</p>
+  <section id="fixture"></section>
+  <pre id="report"></pre>
+  <!-- 本地测试直接复用扩展的同一份 DOM 实现，不依赖 Chrome 扩展管理页的手动重载。 -->
+  <script src="../content.js"></script>
+  <script>
+    (() => {
+      const PHONE = "13800138000";
+      const CODE = "864209";
+      const fixture = document.getElementById("fixture");
+      const status = document.getElementById("status");
+      const report = document.getElementById("report");
+      const results = [];
+
+      function assert(condition, message) {
+        if (!condition) throw new Error(message);
+      }
+
+      function recordClick(id) {
+        const count = Number(document.documentElement.dataset[id] || "0") + 1;
+        document.documentElement.dataset[id] = String(count);
+      }
+
+      function wireStandardEvents(root) {
+        root.querySelectorAll("[data-send]").forEach((button) => button.addEventListener("click", () => recordClick("sendClicks")));
+        root.querySelectorAll("[data-login]").forEach((button) => button.addEventListener("click", () => recordClick("loginClicks")));
+        root.querySelectorAll("[data-resend]").forEach((button) => button.addEventListener("click", () => recordClick("resendClicks")));
+      }
+
+      const scenarios = [
+        {
+          id: "same-screen",
+          title: "同屏手机号、协议、发码与登录",
+          html: `<form><label>手机号 <input id="phone" placeholder="请输入手机号"></label><label><input id="agree" type="checkbox"> 已阅读并同意用户协议和隐私政策</label><button type="button" data-send>发送验证码</button><label>验证码 <input id="code" placeholder="验证码"></label><button type="button" data-login>登录</button></form>`,
+          afterPhone: (result) => {
+            assert(result.status === "ok" && result.filledPhone && result.checkedAgreement && result.clickedRequest, "同屏流程未完成");
+            assert(document.getElementById("phone").value === PHONE, "同屏手机号未填入");
+            assert(document.getElementById("agree").checked, "同屏协议未勾选");
+            assert(document.documentElement.dataset.sendClicks === "1", "同屏发码未点击");
+          },
+          afterCode: (result) => {
+            assert(result.filledCode && result.clickedLogin, "同屏填码或登录未完成");
+            assert(document.getElementById("code").value === CODE, "同屏验证码未填入");
+          }
+        },
+        {
+          id: "outside-agreement",
+          title: "协议在表单外侧",
+          html: `<div id="login-shell"><form><label>手机号 <input id="phone" name="phone"></label><button type="button" data-send>获取验证码</button><label>验证码 <input id="code" placeholder="短信验证码"></label><button type="button" data-login>登录</button></form><label><input id="agree" type="checkbox"> 同意服务协议及隐私政策</label></div>`,
+          afterPhone: (result) => {
+            assert(result.status === "ok" && result.checkedAgreement && result.clickedRequest, "外侧协议流程未完成");
+            assert(document.getElementById("agree").checked, "外侧协议未勾选");
+          },
+          afterCode: (result) => assert(result.filledCode, "外侧协议场景未填码")
+        },
+        {
+          id: "custom-checkbox",
+          title: "自定义协议复选框",
+          html: `<form><label>手机号 <input id="phone" type="tel"></label><div id="agree" role="checkbox" aria-checked="false">同意隐私协议</div><button type="button" data-send>获取校验码</button><label>验证码 <input id="code" placeholder="校验码"></label><button type="button" data-login>确认登录</button></form>`,
+          setup: () => document.getElementById("agree").addEventListener("click", (event) => event.currentTarget.setAttribute("aria-checked", "true")),
+          afterPhone: (result) => {
+            assert(result.status === "ok" && result.checkedAgreement, "自定义协议未处理");
+            assert(document.getElementById("agree").getAttribute("aria-checked") === "true", "自定义协议未勾选");
+          },
+          afterCode: (result) => assert(result.filledCode, "自定义协议场景未填码")
+        },
+        {
+          id: "two-step",
+          title: "手机号后下一步",
+          html: `<section id="step-shell"><form><label>手机号 <input id="phone" placeholder="手机号码"></label><button type="button" id="next">下一步</button></form></section>`,
+          setup: () => document.getElementById("next").addEventListener("click", () => {
+            recordClick("nextClicks");
+            document.getElementById("step-shell").innerHTML = `<form><label><input id="agree" type="checkbox"> 我已阅读并同意服务协议</label><button type="button" data-send>发送短信验证码</button><label>验证码 <input id="code" placeholder="验证码"></label><button type="button" data-login>完成</button></form>`;
+            wireStandardEvents(document.getElementById("step-shell"));
+          }),
+          afterPhone: (result) => {
+            assert(result.status === "ok" && result.clickedNextStep && result.clickedRequest, "分步流程未推进到发码");
+            assert(document.documentElement.dataset.nextClicks === "1", "下一步未点击");
+            assert(document.getElementById("agree").checked, "分步协议未勾选");
+          },
+          afterCode: (result) => assert(result.filledCode, "分步流程未填码")
+        },
+        {
+          id: "dialog",
+          title: "弹窗登录表单",
+          html: `<div role="dialog" aria-label="登录弹窗"><label>手机号 <input id="phone" placeholder="手机号"></label><label><input id="agree" type="checkbox"> 已阅读用户协议</label><button type="button" data-send>发送验证码</button><label>验证码 <input id="code" placeholder="动态码"></label><button type="button" data-login>登录 / 注册</button></div>`,
+          afterPhone: (result) => assert(result.status === "ok" && result.clickedRequest, "弹窗流程未发码"),
+          afterCode: (result) => assert(result.filledCode && result.clickedLogin, "弹窗流程未登录")
+        },
+        {
+          id: "english",
+          title: "英文表单",
+          html: `<form><label>Mobile phone <input id="phone" type="tel" placeholder="Phone number"></label><label><input id="agree" type="checkbox"> I agree to Terms and Privacy</label><button type="button" data-send>Send code</button><label>Verification code <input id="code" placeholder="Verification code"></label><button type="button" data-login>Sign in</button></form>`,
+          afterPhone: (result) => assert(result.status === "ok" && result.checkedAgreement && result.clickedRequest, "英文流程未发码"),
+          afterCode: (result) => assert(result.filledCode && result.clickedLogin, "英文流程未登录")
+        },
+        {
+          id: "otp",
+          title: "六格 OTP",
+          html: `<form><label>手机号 <input id="phone" placeholder="手机号"></label><button type="button" data-send>获取动态码</button><div class="otp"><input maxlength="1" aria-label="验证码第1位"><input maxlength="1" aria-label="验证码第2位"><input maxlength="1" aria-label="验证码第3位"><input maxlength="1" aria-label="验证码第4位"><input maxlength="1" aria-label="验证码第5位"><input maxlength="1" aria-label="验证码第6位"></div><button type="button" data-login>确认</button></form>`,
+          afterPhone: (result) => assert(result.status === "ok" && result.clickedRequest, "OTP 流程未发码"),
+          afterCode: (result) => {
+            assert(result.filledCode, "OTP 未填码");
+            assert(Array.from(document.querySelectorAll(".otp input")).map((input) => input.value).join("") === CODE, "OTP 各格验证码不正确");
+          }
+        },
+        {
+          id: "resend",
+          title: "倒计时重发与可用发码共存",
+          html: `<form><label>手机号 <input id="phone" placeholder="手机"></label><button type="button" data-resend>60s 后重发</button><button type="button" data-send>获取验证码</button><label>验证码 <input id="code" placeholder="验证码"></label><button type="button" data-login>登录</button></form>`,
+          afterPhone: (result) => {
+            assert(result.status === "ok" && result.clickedRequest, "重发场景未点击可用发码");
+            assert((document.documentElement.dataset.resendClicks || "0") === "0", "错误点击了倒计时重发");
+          },
+          afterCode: (result) => assert(result.filledCode, "重发场景未填码")
+        },
+        {
+          id: "nested-agreement",
+          title: "Kimi 区号与嵌套协议",
+          html: `<div class="phone-login"><div class="phone-login-mobile"><input class="region-code" placeholder="+86"><input id="phone" class="phone-login-mobile-number" placeholder="请输入手机号"></div><label class="login-modal-protocol"><span class="protocol-checkbox"><input id="agree" type="checkbox"><span></span></span><p>已阅读同意《模型服务协议》和《用户隐私协议》</p></label><button type="button" data-send>发送验证码</button><input id="code" placeholder="请输入验证码"><button type="button" data-login>登录</button></div>`,
+          setup: () => document.querySelector(".region-code").focus(),
+          afterPhone: (result) => {
+            assert(result.status === "ok" && result.checkedAgreement && result.clickedRequest, "嵌套协议控件未自动勾选并发码");
+            assert(document.getElementById("agree").checked, "嵌套协议复选框未勾选");
+            assert(document.getElementById("phone").value === PHONE, "手机号类名场景填错输入框");
+            assert(document.querySelector(".region-code").value === "", "手机号错误填入了 +86 国家区号框");
+          },
+          afterCode: (result) => assert(result.filledCode && result.clickedLogin, "嵌套协议场景未填码或登录")
+        },
+        {
+          id: "metaso-mui-agreement",
+          title: "秘塔 MUI 协议结构",
+          html: `<form><input class="MuiBox-root" id="desktop-login-phone" inputmode="tel" autocomplete="tel-national" placeholder="手机号" type="tel" name="phone"><input class="MuiBox-root" id="desktop-login-sms" autocomplete="one-time-code" inputmode="numeric" pattern="\\d{4}" placeholder="短信验证码" name="verification"><button class="MuiButtonBase-root MuiButton-root" type="button" data-send>发送验证码</button><label style="cursor: default;"><span class="MuiButtonBase-root MuiCheckbox-root"><input class="PrivateSwitchBase-input" id="desktop-login-policy" type="checkbox" name="policy-checkbox"></span><span>我已阅读并同意<a>《用户协议》</a>和<a>《隐私政策》</a></span></label><button type="button" data-login>登录/注册</button></form>`,
+          afterPhone: (result) => {
+            assert(result.status === "ok" && result.checkedAgreement && result.clickedRequest, "秘塔协议或发码流程未完成");
+            assert(document.getElementById("desktop-login-policy").checked, "秘塔 MUI 协议未勾选");
+            assert(document.documentElement.dataset.sendClicks === "1", "秘塔发送验证码未点击");
+          },
+          afterCode: (result) => assert(result.filledCode && result.clickedLogin, "秘塔场景未填码或登录")
+        },
+        {
+          id: "doubao-async-next",
+          title: "豆包异步启用下一步",
+          html: `<div role="dialog" id="doubao-dialog"><input id="phone" type="text" placeholder="请输入手机号"><button id="doubao-next" type="button" disabled data-disabled="true">下一步</button><label id="doubao-agreement"><button id="agree" type="button" role="checkbox" aria-checked="false" data-state="unchecked"></button><span>已阅读并同意 用户协议、隐私政策、豆包账号服务须知</span></label></div>`,
+          setup: () => {
+            const phone = document.getElementById("phone");
+            const next = document.getElementById("doubao-next");
+            const agreement = document.getElementById("doubao-agreement");
+            agreement.addEventListener("click", () => {
+              const checkbox = document.getElementById("agree");
+              checkbox.setAttribute("aria-checked", "true");
+              checkbox.dataset.state = "checked";
+            });
+            phone.addEventListener("input", () => {
+              next.disabled = phone.value.length !== PHONE.length;
+              next.dataset.disabled = String(next.disabled);
+            });
+            next.addEventListener("click", () => {
+              recordClick("nextClicks");
+              document.getElementById("doubao-dialog").innerHTML = `<button type="button" data-send>发送验证码</button><input id="code" placeholder="请输入验证码"><button type="button" data-login>登录</button>`;
+              wireStandardEvents(document.getElementById("doubao-dialog"));
+            });
+          },
+          afterPhone: (result) => {
+            assert(result.status === "ok" && result.checkedAgreement && result.clickedNextStep && result.clickedRequest, "豆包未通过下一步推进到发码");
+            assert(document.documentElement.dataset.nextClicks === "1", "豆包下一步未点击或重复点击");
+            assert(document.documentElement.dataset.sendClicks === "1", "豆包下一步后未点击发送验证码");
+          },
+          afterCode: (result) => assert(result.filledCode && result.clickedLogin, "豆包场景未填码或登录")
+        },
+        {
+          id: "baidu-resend-agreement",
+          title: "百度重新发送态与关联协议",
+          html: `<div role="dialog"><input id="phone" type="text" name="username" placeholder="请输入手机号"><input id="code" type="text" name="password" maxlength="6" placeholder="验证码" value="608833"><button type="button" data-resend>重新发送</button><span id="agreement-wrapper"><input id="agree" name="smsIsAgree" type="checkbox"><label for="agree">阅读并接受</label><a>百度用户协议</a> 和 <a>隐私政策</a></span><button type="button" data-login disabled>登录</button></div>`,
+          setup: () => document.getElementById("code").focus(),
+          afterPhone: (result) => {
+            assert(result.status === "failed" && result.checkedAgreement && !result.clickedRequest, "百度重发态被错误当成首次发码成功");
+            assert(document.getElementById("phone").value === PHONE, "百度手机号没有填入手机号框");
+            assert(document.getElementById("agree").checked, "百度关联协议未勾选");
+            assert((document.documentElement.dataset.resendClicks || "0") === "0", "百度重新发送按钮被误点");
+            assert(document.getElementById("code").value === "608833", "百度已有验证码被意外修改");
+          }
+        },
+        {
+          id: "linked-label-agreement",
+          title: "关联 label 与相邻协议链接",
+          html: `<form><label>手机号 <input id="phone" placeholder="手机号"></label><span class="agreement"><input id="agree" type="checkbox"><label for="agree">阅读并接受</label><a>用户协议</a> 和 <a>隐私政策</a></span><button type="button" data-send>发送验证码</button><input id="code" placeholder="验证码"><button type="button" data-login>登录</button></form>`,
+          afterPhone: (result) => {
+            assert(result.status === "ok" && result.checkedAgreement && result.clickedRequest, "关联 label 协议未自动勾选并发码");
+            assert(document.getElementById("agree").checked, "关联 label 协议复选框未勾选");
+          },
+          afterCode: (result) => assert(result.filledCode && result.clickedLogin, "关联 label 协议场景未填码或登录")
+        },
+        {
+          id: "captcha",
+          title: "人机验证人工介入",
+          html: `<form><label>手机号 <input id="phone" placeholder="手机号"></label><div class="geetest-panel">安全验证：请完成验证后继续</div><button type="button" data-send>发送验证码</button><label>验证码 <input id="code" placeholder="验证码"></label></form>`,
+          afterPhone: (result) => {
+            assert(result.status === "manual" && result.manualInterventionRequired, "人机验证未转为人工介入");
+            assert((document.documentElement.dataset.sendClicks || "0") === "0", "人机验证场景仍点击了发码");
+          }
+        },
+        {
+          id: "iframe",
+          title: "嵌入页人工降级",
+          html: `<iframe title="登录嵌入页" srcdoc="<form><label>手机号 <input type='tel'></label><button>发送验证码</button></form>"></iframe>`,
+          afterPhone: (result) => assert(result.status === "manual" && result.manualInterventionRequired, "iframe 未优雅降级")
+        },
+        {
+          id: "email-login",
+          title: "邮箱登录、协议与发码",
+          commandType: "emailLogin",
+          html: `<form><label>邮箱 <input id="email" type="email" autocomplete="email" placeholder="邮箱"></label><label><input id="agree" type="checkbox"> 阅读并接受用户协议</label><button type="button" data-send>Send code</button><input id="code" placeholder="verification code"><button type="button" data-login>Sign in</button></form>`,
+          afterPhone: (result) => {
+            assert(result.status === "ok" && result.checkedAgreement && result.clickedRequest, "邮箱前半链路未完成协议或发码");
+            assert(document.getElementById("email").value === "person@example.com", "邮箱没有填入邮箱框");
+          },
+          afterCode: (result) => assert(result.filledCode && result.clickedLogin, "邮箱场景未填码或登录")
+        }
+      ];
+
+      function renderScenario(scenario) {
+        document.documentElement.dataset.sendClicks = "0";
+        document.documentElement.dataset.loginClicks = "0";
+        document.documentElement.dataset.resendClicks = "0";
+        document.documentElement.dataset.nextClicks = "0";
+        fixture.innerHTML = `<h2>${scenario.title}</h2>${scenario.html}`;
+        wireStandardEvents(fixture);
+        scenario.setup?.();
+      }
+
+      async function invoke(command) {
+        return window.SmsCodeDomBridgeTest.handleCommand(command);
+      }
+
+      async function runSuite() {
+        const loadedDeadline = Date.now() + 6000;
+        while (typeof window.SmsCodeDomBridgeTest?.handleCommand !== "function") {
+          if (Date.now() > loadedDeadline) throw new Error("前半链路测试 API 未加载");
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+
+        for (const [index, scenario] of scenarios.entries()) {
+          renderScenario(scenario);
+          const phoneResult = await invoke({
+            type: scenario.commandType || "phoneLogin",
+            sessionID: `local-mock-${index}-phone`,
+            phoneNumber: scenario.commandType === "emailLogin" ? "person@example.com" : PHONE
+          });
+          scenario.afterPhone(phoneResult);
+          if (scenario.afterCode) {
+            const codeResult = await invoke({
+              type: "fillCode",
+              sessionID: `local-mock-${index}-code`,
+              verificationCode: CODE,
+              autoSubmit: true
+            });
+            scenario.afterCode(codeResult);
+          }
+          results.push(`通过：${scenario.title}`);
+          report.textContent = results.join("\n");
+        }
+        status.textContent = `全部通过：${scenarios.length} 类前半链路 mock`;
+        status.className = "passed";
+        document.documentElement.dataset.smsCodeMockStatus = "passed";
+      }
+
+      runSuite().catch((error) => {
+        status.textContent = `失败：${error.message}`;
+        status.className = "failed";
+        document.documentElement.dataset.smsCodeMockStatus = "failed";
+        report.textContent = `${report.textContent}\n失败：${error.stack || error.message}`.trim();
+      });
+    })();
+  </script>
+</body>
+</html>

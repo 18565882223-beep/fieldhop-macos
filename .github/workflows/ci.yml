@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: 显示 Swift 版本
+        run: swift --version
+      - name: 运行 Swift 测试
+        run: swift test
+      - name: 检查 Chrome 扩展脚本语法
+        run: |
+          node --check ChromeExtension/content.js
+          node --check ChromeExtension/service-worker.js
+

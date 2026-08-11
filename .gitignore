@@ -1,0 +1,37 @@
+# Swift
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+*.app/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 本地运行与调试数据
+artifacts/
+*.log
+*.db
+*.sqlite
+*.zip
+*.gitbundle
+.env
+.env.*
+
+# 凭据与签名材料
+*.key
+*.pem
+*.p12
+*.mobileprovision
+credentials*
+secrets*
+
