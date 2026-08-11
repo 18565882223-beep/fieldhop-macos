@@ -17,7 +17,7 @@ final class DebugWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "短信验证码调试"
+        window.title = "FieldHop"
         window.center()
         window.isReleasedWhenClosed = false
 
@@ -45,7 +45,7 @@ final class DebugWindowController: NSWindowController {
         let root = NSView()
         root.translatesAutoresizingMaskIntoConstraints = false
 
-        let title = NSTextField(labelWithString: "短信验证码调试")
+        let title = NSTextField(labelWithString: "FieldHop")
         title.font = .boldSystemFont(ofSize: 18)
 
         [stateLabel, recentCodeLabel, permissionLabel].forEach {

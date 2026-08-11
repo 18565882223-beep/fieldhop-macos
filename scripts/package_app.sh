@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_PATH="$ROOT_DIR/短信验证码调试.app"
+APP_PATH="$ROOT_DIR/FieldHop.app"
 CONTENTS_PATH="$APP_PATH/Contents"
 MACOS_PATH="$CONTENTS_PATH/MacOS"
 RESOURCES_PATH="$CONTENTS_PATH/Resources"
@@ -47,7 +47,7 @@ cat > "$CONTENTS_PATH/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>短信验证码调试</string>
+    <string>FieldHop</string>
     <key>CFBundleExecutable</key>
     <string>SmsCodeMenuBar</string>
     <key>CFBundleIdentifier</key>
@@ -57,7 +57,7 @@ cat > "$CONTENTS_PATH/Info.plist" <<'PLIST'
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>CFBundleName</key>
-    <string>短信验证码调试</string>
+    <string>FieldHop</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

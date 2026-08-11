@@ -252,7 +252,7 @@ public enum IMAPCommandBuilder {
     }
 
     public static func clientID(tag: String) -> String {
-        "\(tag) ID (\"name\" \"SmsCodeMenuBar\" \"version\" \"1.0\" \"vendor\" \"local\")\r\n"
+        "\(tag) ID (\"name\" \"FieldHop\" \"version\" \"1.0\" \"vendor\" \"local\")\r\n"
     }
 
     public static func examineInbox(tag: String) -> String {

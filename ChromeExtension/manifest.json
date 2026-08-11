@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Sms Code DOM Bridge",
+  "name": "FieldHop DOM Bridge",
   "version": "0.1.0",
-  "description": "DOM bridge for the local SmsCodeMenuBar app.",
+  "description": "Local-only browser bridge for FieldHop OTP workflows.",
   "host_permissions": [
     "<all_urls>",
     "http://127.0.0.1:47873/*",

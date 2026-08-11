@@ -1,63 +1,111 @@
-# SmsCodeMenuBar
+<p align="center">
+  <img src="./图标/appicon.png" width="120" alt="FieldHop icon">
+</p>
 
-一个开源的 macOS 菜单栏工具：从本机 Messages 数据库或用户配置的邮箱中识别一次性验证码（OTP），在安全条件满足时填入当前验证码输入框，否则复制到剪贴板作为兜底。
+<h1 align="center">FieldHop</h1>
 
-项目采用 Swift 5.9、AppKit、SQLite、Accessibility API，并提供一个可选的 Manifest V3 Chrome 扩展，用于网页手机号、协议和验证码输入框的 DOM 协作。
+<p align="center"><strong>One-time codes. One safe hop. Entirely on your Mac.</strong></p>
 
-## 主要能力
+<p align="center">
+  FieldHop carries verification codes from Messages or email to the right input field,<br>
+  with local processing, explicit safety gates, and a clipboard fallback when anything is uncertain.
+</p>
 
-- 从本机 `~/Library/Messages/chat.db` 读取最近的短信或 iMessage 验证码。
-- 解析常见纯数字、字母数字混合及多种邮件 MIME/字符集验证码格式。
-- 仅在验证码字段、有效时间窗和目标会话匹配时自动填入。
-- 不满足自动填入条件时降级为临时剪贴板复制。
-- 通过系统 Keychain 保存手机号和邮箱授权码；账号元数据与凭据分离。
-- 可选 Chrome 扩展支持手机号填写、必要协议勾选、发送验证码和分格 OTP。
-- 遇到图形验证码、滑块或其他人机验证时停止自动操作，由用户手动完成。
+<p align="center">
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="SECURITY.md">Security</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
 
-## 系统要求
+<p align="center">
+  <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple">
+  <img alt="Swift 5.9+" src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white">
+  <img alt="132 tests" src="https://img.shields.io/badge/Swift_tests-132_passing-2DA44E">
+  <img alt="Local first" src="https://img.shields.io/badge/privacy-local--first-6F42C1">
+  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-0969DA">
+</p>
 
-- macOS 13 或更高版本
-- Swift 5.9 或兼容版本
-- 已在 Mac 的“信息”App 中启用短信转发或 iMessage 同步（短信来源）
-- Google Chrome（仅在使用可选 DOM 桥时需要）
+## The last meter of OTP autofill
 
-## 从源码构建
+Password managers can generate TOTP codes, and macOS can receive messages from an iPhone. The awkward gap is everything in between: a fresh code still has to be found, understood, matched to the active login, and placed in the correct field.
+
+FieldHop focuses on that last meter. It is a native menu bar utility—not a cloud relay and not a CAPTCHA bypass—that handles SMS and email codes on the Mac where they arrive.
+
+```mermaid
+flowchart LR
+    A["Messages<br/>read-only SQLite"] --> C["Local OTP<br/>extraction"]
+    B["Email<br/>TLS + read-only IMAP"] --> C
+    C --> D{"Safety gate"}
+    D -->|"session + age + target match"| E["Focused OTP field"]
+    D -->|"anything uncertain"| F["Temporary clipboard fallback"]
+```
+
+## Why FieldHop is different
+
+| Principle | What it means in practice |
+| --- | --- |
+| **Local by default** | No account service, telemetry SDK, or remote message processing. Messages, parsing, matching, and filling stay on the Mac. |
+| **Conservative automation** | Codes are filled only when the active session, age, host, and focused field agree. Uncertainty triggers a safe fallback instead of a guess. |
+| **Real-world input coverage** | Supports numeric and alphanumeric codes, MIME email bodies, legacy message formats, segmented OTP fields, and varied login-page layouts. |
+| **Human verification stays human** | CAPTCHA, sliders, text-selection challenges, and site risk controls are never bypassed. |
+| **Built to be maintained** | 132 Swift tests, 16 reproducible browser-layout mocks, CI, redacted diagnostics, and zero external Swift package dependencies. |
+
+## What it can do
+
+- Read recent SMS and iMessage verification codes from the local Messages database.
+- Monitor user-configured email accounts with TLS and read-only IMAP commands.
+- Parse common OTP formats across plain text, HTML, Base64, multipart MIME, and several legacy encodings.
+- Fill a focused verification field or a segmented multi-box OTP form.
+- Fall back to a short-lived clipboard value when the target is not safe enough.
+- Store phone numbers and email authorization codes in macOS Keychain.
+- Optionally coordinate phone entry, required agreements, request-code buttons, and OTP fields through a Manifest V3 Chrome extension.
+
+## Safety model
+
+FieldHop treats automatic input as a policy decision, not a convenience shortcut:
+
+1. A code must come from a recent, relevant message.
+2. A matching wait or login session must still be active.
+3. The foreground app, browser host, and focused field must match the expected target.
+4. High-risk or ambiguous authentication content is downgraded to manual confirmation.
+5. If any gate fails, FieldHop does not type the code automatically.
+
+See [SECURITY.md](SECURITY.md) for the disclosure process and data-handling boundaries.
+
+## Requirements
+
+- macOS 13 or later
+- Swift 5.9 or a compatible toolchain
+- Messages/iMessage sync or iPhone Text Message Forwarding for SMS codes
+- Google Chrome only when using the optional DOM bridge
+
+## Build from source
 
 ```bash
 git clone <repository-url>
-cd sms-code-autofill-macos
+cd fieldhop-macos
 swift test
 ./scripts/package_app.sh
-open ./短信验证码调试.app
+open ./FieldHop.app
 ```
 
-首次运行需要根据功能授予以下权限：
+Depending on the features you enable, macOS may ask for:
 
-- **完全磁盘访问**：只读访问本机 Messages 数据库。
-- **辅助功能**：识别当前输入框并模拟键盘输入。
+- **Full Disk Access** to read the local Messages database.
+- **Accessibility** to inspect the focused field and simulate typing.
 
-本地签名发生变化时，macOS 可能要求重新授予权限。正式分发建议使用 Apple Developer ID 签名与公证；当前脚本在找不到指定签名身份时使用临时签名。
+The local build script uses an ad-hoc signature when no matching signing identity is available. A signature change can cause macOS to request permissions again. This repository does not distribute a notarized binary yet.
 
-## Chrome 扩展（可选）
+## Optional Chrome bridge
 
-1. 打开 `chrome://extensions`。
-2. 开启“开发者模式”。
-3. 选择“加载已解压的扩展程序”，加载 `ChromeExtension` 目录。
+1. Open `chrome://extensions`.
+2. Enable **Developer mode**.
+3. Choose **Load unpacked** and select the `ChromeExtension` directory.
 
-扩展只与本机 `127.0.0.1:47873` 桥接服务通信，不保存手机号或验证码。由于需要识别不同网站上的登录表单，扩展声明了广泛的页面访问权限；不需要网页自动化时，请不要安装扩展。
+The extension communicates only with the local bridge at `127.0.0.1:47873`. It does not persist phone numbers or OTPs. Because it needs to recognize login forms across websites, it requests broad page access; do not install it if you only need the native fallback workflow.
 
-## 隐私与安全
-
-- 项目不包含遥测、分析 SDK 或远程账号服务。
-- Messages 数据库读取、验证码识别和自动填入在本机完成。
-- 邮箱授权码保存在 macOS Keychain，不写入日志、UserDefaults 或源码。
-- 邮件访问使用 TLS、只读邮箱命令和 `BODY.PEEK`，避免修改邮件已读状态。
-- 日志应只包含脱敏邮箱、状态和掩码验证码。
-- 本项目不会尝试破解或绕过 CAPTCHA、人机验证或站点风控。
-
-这是安全敏感工具。使用前请阅读 [SECURITY.md](SECURITY.md)，并只在自己拥有或获准使用的账号与设备上运行。
-
-## 测试
+## Verify the project
 
 ```bash
 swift test
@@ -65,23 +113,18 @@ node --check ChromeExtension/content.js
 node --check ChromeExtension/service-worker.js
 ```
 
-本地前半链路 mock 需要 Playwright 和 Google Chrome：
+The repeatable front-link mock suite additionally requires Playwright and Google Chrome:
 
 ```bash
 node scripts/run_frontlink_mock.cjs
 ```
 
-## 当前限制
+## Project status
 
-- 真实短信端到端测试依赖用户本机权限、iPhone 短信转发和真实验证码场景。
-- 不同邮箱服务商对 IMAP、授权码和安全策略的支持存在差异。
-- Chrome 扩展使用开发者模式加载，尚未发布到 Chrome Web Store。
-- 当前构建脚本主要面向源码用户，未提供经过公证的安装包。
+FieldHop is an early public release built from a working personal utility. The engineering baseline is tested, while real-world compatibility will continue to grow through honest reports across macOS versions, websites, message formats, and email providers. Adoption numbers are not inferred or manufactured.
 
-## 参与贡献
+Issues and focused pull requests are welcome. Please remove all phone numbers, email addresses, codes, credentials, message contents, and local paths before sharing diagnostics. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-欢迎提交可复现的问题、测试样例和小范围修复。提交前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+## License
 
-## 许可证
-
-[MIT License](LICENSE)
+FieldHop is available under the [MIT License](LICENSE).

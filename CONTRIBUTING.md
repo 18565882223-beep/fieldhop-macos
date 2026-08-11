@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢你参与 SmsCodeMenuBar。
+感谢你参与 FieldHop。
 
 ## 提交问题
 
@@ -32,4 +32,3 @@ node scripts/run_frontlink_mock.cjs
 - 自动操作必须有安全门禁和失败降级路径。
 - 不实现 CAPTCHA、人机验证或访问控制绕过。
 - 保持改动小而可验证，避免无关重构。
-

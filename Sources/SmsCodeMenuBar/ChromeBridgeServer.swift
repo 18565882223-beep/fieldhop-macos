@@ -210,7 +210,7 @@ final class ChromeBridgeServer {
         }
 
         if method == "GET", path.hasPrefix("/ping") {
-            return jsonResponse(["ok": true, "service": "SmsCodeMenuBar Chrome Bridge"])
+            return jsonResponse(["ok": true, "service": "FieldHop Chrome Bridge"])
         }
 
         if method == "GET", path.hasPrefix("/command") {
